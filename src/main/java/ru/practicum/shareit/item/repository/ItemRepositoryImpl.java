@@ -59,6 +59,14 @@ public class ItemRepositoryImpl implements ItemRepository {
     }
 
     @Override
+    public boolean existsByOwnerIdAndNameIgnoreCase(Long ownerId, String name) {
+        return storage.values().stream()
+                .anyMatch(item -> item.getOwner() != null
+                        && item.getOwner().getId().equals(ownerId)
+                        && item.getName().equalsIgnoreCase(name));
+    }
+
+    @Override
     public void deleteById(Long id) {
         storage.remove(id);
     }

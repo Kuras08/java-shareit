@@ -41,6 +41,18 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public boolean existsById(Long id) {
+        return storage.containsKey(id);
+    }
+
+    @Override
+    public boolean existsByEmailIgnoreCase(String email) {
+        return storage.values().stream()
+                .anyMatch(user -> user.getEmail().equalsIgnoreCase(email));
+    }
+
+
+    @Override
     public void deleteById(Long id) {
         storage.remove(id);
     }

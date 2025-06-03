@@ -14,5 +14,9 @@ public interface UserRepository {
 
     User update(User user);
 
+    boolean existsById(Long id);
+
+    boolean existsByEmailIgnoreCase(String email);
+
     void deleteById(Long id);
 }

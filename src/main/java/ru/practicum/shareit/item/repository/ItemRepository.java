@@ -17,6 +17,8 @@ public interface ItemRepository {
 
     Item update(Item item);
 
+    boolean existsByOwnerIdAndNameIgnoreCase(Long ownerId, String name);
+
     void deleteById(Long id);
 }
 
