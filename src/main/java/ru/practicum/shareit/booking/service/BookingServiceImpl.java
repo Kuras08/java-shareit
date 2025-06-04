@@ -1,7 +1,6 @@
 package ru.practicum.shareit.booking.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.dto.BookingDto;
@@ -77,7 +76,6 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toDto(bookingRepository.save(booking));
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public BookingDto getBooking(Long userId, Long bookingId) {
@@ -97,40 +95,51 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public List<BookingDto> getUserBookings(Long userId, String state) {
-        userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        if (!userRepository.existsById(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
 
-        List<Booking> bookings = bookingRepository.findByBooker_Id(userId, Sort.by(Sort.Direction.DESC, "start"));
-        return filterBookingsByState(bookings, state);
+        return getBookingsByStateForBooker(userId, state).stream()
+                .map(bookingMapper::toDto)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<BookingDto> getOwnerBookings(Long ownerId, String state) {
-        userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        if (!userRepository.existsById(ownerId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
 
-        List<Booking> bookings = bookingRepository.findByItem_Owner_Id(ownerId, Sort.by(Sort.Direction.DESC, "start"));
-        return filterBookingsByState(bookings, state);
-    }
-
-    private List<BookingDto> filterBookingsByState(List<Booking> bookings, String state) {
-        LocalDateTime now = LocalDateTime.now();
-        BookingState bookingState = BookingState.from(state);
-
-        return bookings.stream()
-                .filter(booking -> switch (bookingState) {
-                    case ALL -> true;
-                    case CURRENT -> booking.getStart().isBefore(now) && booking.getEnd().isAfter(now);
-                    case PAST -> booking.getEnd().isBefore(now);
-                    case FUTURE -> booking.getStart().isAfter(now);
-                    case WAITING -> booking.getStatus() == BookingStatus.WAITING;
-                    case REJECTED -> booking.getStatus() == BookingStatus.REJECTED;
-                })
+        return getBookingsByStateForOwner(ownerId, state).stream()
                 .map(bookingMapper::toDto)
                 .collect(Collectors.toList());
     }
-}
 
+    private List<Booking> getBookingsByStateForBooker(Long userId, String state) {
+        LocalDateTime now = LocalDateTime.now();
+        return switch (BookingState.from(state)) {
+            case ALL -> bookingRepository.findAllByBookerId(userId);
+            case CURRENT -> bookingRepository.findCurrentByBookerId(userId, now);
+            case PAST -> bookingRepository.findPastByBookerId(userId, now);
+            case FUTURE -> bookingRepository.findFutureByBookerId(userId, now);
+            case WAITING -> bookingRepository.findWaitingByBookerId(userId);
+            case REJECTED -> bookingRepository.findRejectedByBookerId(userId);
+        };
+    }
+
+    private List<Booking> getBookingsByStateForOwner(Long ownerId, String state) {
+        LocalDateTime now = LocalDateTime.now();
+        return switch (BookingState.from(state)) {
+            case ALL -> bookingRepository.findAllByOwnerId(ownerId);
+            case CURRENT -> bookingRepository.findCurrentByOwnerId(ownerId, now);
+            case PAST -> bookingRepository.findPastByOwnerId(ownerId, now);
+            case FUTURE -> bookingRepository.findFutureByOwnerId(ownerId, now);
+            case WAITING -> bookingRepository.findWaitingByOwnerId(ownerId);
+            case REJECTED -> bookingRepository.findRejectedByOwnerId(ownerId);
+        };
+    }
+
+}
 
 

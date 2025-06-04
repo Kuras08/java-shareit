@@ -6,9 +6,13 @@ public enum BookingState {
     ALL, CURRENT, PAST, FUTURE, WAITING, REJECTED;
 
     public static BookingState from(String value) {
+        if (value == null) {
+            throw new ValidationException("State must not be null");
+        }
+
         try {
             return BookingState.valueOf(value.toUpperCase());
-        } catch (IllegalArgumentException | NullPointerException e) {
+        } catch (IllegalArgumentException e) {
             throw new ValidationException("Unknown state: " + value);
         }
     }
