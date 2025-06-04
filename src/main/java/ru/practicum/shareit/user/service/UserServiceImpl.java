@@ -1,5 +1,6 @@
 package ru.practicum.shareit.user.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exception.DuplicatedDataException;
@@ -10,18 +11,16 @@ import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.repository.UserRepository;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
-    public UserServiceImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Override
     public UserDto create(UserDto userDto) {
@@ -32,10 +31,10 @@ public class UserServiceImpl implements UserService {
             throw new DuplicatedDataException("Пользователь с таким email уже существует");
         }
 
-        User user = UserMapper.toUser(userDto);
+        User user = userMapper.toUser(userDto);
         User saved = userRepository.save(user);
         log.info("Пользователь создан с id={}", saved.getId());
-        return UserMapper.toUserDto(saved);
+        return userMapper.toUserDto(saved);
     }
 
     @Override
@@ -45,17 +44,17 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Пользователь с id={} не найден", id);
-                    return new NoSuchElementException("Пользователь с id " + id + " не найден");
+                    return new NotFoundException("Пользователь с id " + id + " не найден");
                 });
 
-        return UserMapper.toUserDto(user);
+        return userMapper.toUserDto(user);
     }
 
     @Override
     public List<UserDto> getAll() {
         log.info("Получение всех пользователей");
         return userRepository.findAll().stream()
-                .map(UserMapper::toUserDto)
+                .map(userMapper::toUserDto)
                 .collect(Collectors.toList());
     }
 
@@ -70,9 +69,7 @@ public class UserServiceImpl implements UserService {
                 });
 
         if (userDto.getEmail() != null &&
-                userRepository.findAll().stream()
-                        .anyMatch(u -> !u.getId().equals(id) &&
-                                u.getEmail().equalsIgnoreCase(userDto.getEmail()))) {
+                userRepository.existsByEmailIgnoreCaseAndIdNot(userDto.getEmail(), id)) {
             throw new DuplicatedDataException("Email уже используется другим пользователем");
         }
 
@@ -85,7 +82,7 @@ public class UserServiceImpl implements UserService {
 
         User saved = userRepository.save(existingUser);
         log.info("Пользователь id={} успешно обновлён", saved.getId());
-        return UserMapper.toUserDto(saved);
+        return userMapper.toUserDto(saved);
     }
 
     @Override
