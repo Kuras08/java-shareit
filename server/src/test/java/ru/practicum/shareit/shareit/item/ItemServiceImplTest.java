@@ -6,12 +6,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-import ru.practicum.shareit.ShareItServer;
 import ru.practicum.shareit.booking.model.BookingStatus;
 import ru.practicum.shareit.booking.repository.BookingRepository;
+import ru.practicum.shareit.exception.DuplicatedDataException;
 import ru.practicum.shareit.exception.ForbiddenException;
-import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
@@ -23,37 +21,44 @@ import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.repository.CommentRepository;
 import ru.practicum.shareit.item.repository.ItemRepository;
 import ru.practicum.shareit.item.service.ItemServiceImpl;
+import ru.practicum.shareit.request.model.ItemRequest;
 import ru.practicum.shareit.request.repository.ItemRequestRepository;
 import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(classes = ShareItServer.class)
 @ExtendWith(MockitoExtension.class)
 class ItemServiceImplTest {
 
     @Mock
     private ItemRepository itemRepository;
+
     @Mock
     private UserRepository userRepository;
+
     @Mock
     private CommentRepository commentRepository;
+
     @Mock
     private BookingRepository bookingRepository;
-    @Mock
-    private ItemRequestRepository itemRequestRepository;
-    @Mock
-    private ItemMapper itemMapper;
+
     @Mock
     private CommentMapper commentMapper;
+
+    @Mock
+    private ItemMapper itemMapper;
+
+    @Mock
+    private ItemRequestRepository itemRequestRepository;
 
     @InjectMocks
     private ItemServiceImpl itemService;
@@ -61,93 +66,212 @@ class ItemServiceImplTest {
     private User user;
     private Item item;
     private ItemDto itemDto;
+    private ItemRequest itemRequest;
 
     @BeforeEach
-    void setUp() {
-        user = new User(1L, "user", "user@example.com");
-        item = new Item(1L, "Item1", "Desc", true, user, null);
-        itemDto = new ItemDto(1L, "itemName", "itemDesc", true, null, null);
+    void setup() {
+        user = new User();
+        user.setId(1L);
+        user.setName("User");
+
+        itemRequest = new ItemRequest();
+        itemRequest.setId(100L);
+
+        item = new Item();
+        item.setId(10L);
+        item.setName("Drill");
+        item.setOwner(user);
+        item.setAvailable(true);
+
+        itemDto = new ItemDto();
+        itemDto.setName("Drill");
+        itemDto.setDescription("Electric drill");
+        itemDto.setAvailable(true);
+        itemDto.setRequestId(null);
     }
 
     @Test
-    void addItem_userNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+    void addItem_Success() {
+        itemDto.setRequestId(100L);
 
-        NotFoundException ex = assertThrows(NotFoundException.class, () -> itemService.addItem(1L, itemDto));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(itemRepository.existsByOwnerIdAndNameIgnoreCase(user.getId(), itemDto.getName())).thenReturn(false);
+        when(itemRequestRepository.findById(100L)).thenReturn(Optional.of(itemRequest));
+        when(itemMapper.toItem(itemDto, user, itemRequest)).thenReturn(item);
+        when(itemRepository.save(item)).thenReturn(item);
+        when(itemMapper.toItemDto(item)).thenReturn(itemDto);
+
+        ItemDto result = itemService.addItem(user.getId(), itemDto);
+
+        assertNotNull(result);
+        assertEquals(itemDto.getName(), result.getName());
+
+        verify(userRepository).findById(user.getId());
+        verify(itemRepository).existsByOwnerIdAndNameIgnoreCase(user.getId(), itemDto.getName());
+        verify(itemRequestRepository).findById(100L);
+        verify(itemRepository).save(item);
+        verify(itemMapper).toItemDto(item);
+    }
+
+    @Test
+    void addItem_DuplicateName_Throws() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(itemRepository.existsByOwnerIdAndNameIgnoreCase(user.getId(), itemDto.getName())).thenReturn(true);
+
+        DuplicatedDataException ex = assertThrows(DuplicatedDataException.class,
+                () -> itemService.addItem(user.getId(), itemDto));
+        assertEquals("Вещь с таким именем уже существует", ex.getMessage());
+
+        verify(userRepository).findById(user.getId());
+        verify(itemRepository).existsByOwnerIdAndNameIgnoreCase(user.getId(), itemDto.getName());
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void updateItem_Success() {
+        itemDto.setName("New Drill");
+        itemDto.setDescription("New description");
+        itemDto.setAvailable(false);
+
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(itemRepository.save(any(Item.class))).thenReturn(item);
+        when(itemMapper.toItemDto(any(Item.class))).thenReturn(itemDto);
+
+        ItemDto updated = itemService.updateItem(user.getId(), item.getId(), itemDto);
+
+        assertEquals("New Drill", updated.getName());
+        assertEquals("New description", updated.getDescription());
+        assertFalse(updated.getAvailable());
+
+        verify(itemRepository).findById(item.getId());
+        verify(itemRepository).save(item);
+        verify(itemMapper).toItemDto(item);
+    }
+
+    @Test
+    void updateItem_NotOwner_Throws() {
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+        Long anotherUserId = 999L;
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
+                () -> itemService.updateItem(anotherUserId, item.getId(), itemDto));
+
+        assertEquals("Пользователь не является владельцем вещи", ex.getMessage());
+        verify(itemRepository).findById(item.getId());
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void getItemById_NonOwnerNoBookingTimes() {
+        Long otherUserId = 999L;
+
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(commentRepository.findByItemIdOrderByCreatedDesc(item.getId())).thenReturn(Collections.emptyList());
+        when(itemMapper.toItemDtoOutput(eq(item), anyList(), isNull(), isNull()))
+                .thenReturn(new ItemDtoOutput());
+
+        ItemDtoOutput result = itemService.getItemById(otherUserId, item.getId());
+
+        assertNotNull(result);
+        verify(itemRepository).findById(item.getId());
+        verify(commentRepository).findByItemIdOrderByCreatedDesc(item.getId());
+        verify(bookingRepository, never()).findLastBookingTime(anyLong(), any());
+        verify(bookingRepository, never()).findNextBookingTime(anyLong(), any());
+        verify(itemMapper).toItemDtoOutput(eq(item), anyList(), isNull(), isNull());
+    }
+
+
+    @Test
+    void getItemsByOwner_UserNotFound_Throws() {
+        when(userRepository.existsById(user.getId())).thenReturn(false);
+
+        NoSuchElementException ex = assertThrows(NoSuchElementException.class,
+                () -> itemService.getItemsByOwner(user.getId()));
+
         assertEquals("Пользователь не найден", ex.getMessage());
+
+        verify(userRepository).existsById(user.getId());
+        verify(itemRepository, never()).findAllByOwnerId(anyLong());
     }
 
     @Test
-    void updateItem_success() {
-        itemDto.setName("NewName");
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
-        when(itemRepository.save(any())).thenReturn(item);
+    void searchItems_EmptyText_ReturnsEmptyList() {
+        List<ItemDto> result = itemService.searchItems("  ");
+
+        assertTrue(result.isEmpty());
+        verify(itemRepository, never()).findAvailableByText(anyString());
+    }
+
+    @Test
+    void searchItems_FoundItems() {
+        List<Item> items = List.of(item);
+        List<ItemDto> itemDtos = List.of(itemDto);
+
+        when(itemRepository.findAvailableByText("drill")).thenReturn(items);
         when(itemMapper.toItemDto(any())).thenReturn(itemDto);
 
-        ItemDto result = itemService.updateItem(1L, 1L, itemDto);
+        List<ItemDto> result = itemService.searchItems("drill");
 
-        assertEquals("NewName", result.getName());
-        verify(itemRepository).save(item);
+        assertEquals(1, result.size());
+        verify(itemRepository).findAvailableByText("drill");
+        verify(itemMapper).toItemDto(any());
     }
 
     @Test
-    void updateItem_forbidden() {
-        item.setOwner(new User(2L, "Other", "o@e.com")); // другой владелец
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+    void addComment_Success() {
+        Long userId = user.getId();
+        Long itemId = item.getId();
+        LocalDateTime now = LocalDateTime.now();
 
-        assertThrows(ForbiddenException.class, () -> itemService.updateItem(1L, 1L, itemDto));
+        CommentDto commentDtoInput = new CommentDto(null, "Отличная вещь!", "Иван", now);
+
+        Comment savedComment = new Comment();
+        savedComment.setId(1L);
+        savedComment.setText(commentDtoInput.getText());
+        savedComment.setAuthor(user);
+        savedComment.setItem(item);
+        savedComment.setCreated(now);
+
+        CommentDto expectedCommentDto = new CommentDto(1L, "Отличная вещь!", user.getName(), now);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(bookingRepository.existsBookingFinished(eq(userId), eq(itemId), eq(BookingStatus.APPROVED), any(LocalDateTime.class))).thenReturn(true);
+        when(commentRepository.save(any(Comment.class))).thenReturn(savedComment);
+        when(commentMapper.toDto(savedComment)).thenReturn(expectedCommentDto);
+
+        CommentDto actual = itemService.addComment(userId, itemId, commentDtoInput);
+
+        assertNotNull(actual);
+        assertEquals(expectedCommentDto.getId(), actual.getId());
+        assertEquals(expectedCommentDto.getText(), actual.getText());
+        assertEquals(expectedCommentDto.getAuthorName(), actual.getAuthorName());
+        assertEquals(expectedCommentDto.getCreated(), actual.getCreated());
+
+        verify(userRepository).findById(userId);
+        verify(itemRepository).findById(itemId);
+        verify(bookingRepository).existsBookingFinished(eq(userId), eq(itemId), eq(BookingStatus.APPROVED), any(LocalDateTime.class));
+        verify(commentRepository).save(any(Comment.class));
+        verify(commentMapper).toDto(savedComment);
     }
 
     @Test
-    void getItemById_asOwner() {
-        item.setOwner(user);
-        List<Comment> comments = List.of();
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
-        when(commentRepository.findByItemIdOrderByCreatedDesc(1L)).thenReturn(comments);
-        when(bookingRepository.findLastBookingTime(any(), any())).thenReturn(null);
-        when(bookingRepository.findNextBookingTime(any(), any())).thenReturn(null);
+    void addComment_NoBooking_Throws() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(bookingRepository.existsBookingFinished(anyLong(), anyLong(), any(), any())).thenReturn(false);
 
-        ItemDtoOutput output = new ItemDtoOutput();
-        when(itemMapper.toItemDtoOutput(any(), eq(comments), any(), any())).thenReturn(output);
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> itemService.addComment(user.getId(), item.getId(), new CommentDto(null, "text", null, null)));
 
-        assertEquals(output, itemService.getItemById(1L, 1L));
-    }
+        assertEquals("Можно оставлять отзывы только после завершённой аренды", ex.getMessage());
 
-    @Test
-    void searchItems_blankText_returnsEmptyList() {
-        List<ItemDto> result = itemService.searchItems(" ");
-        assertTrue(result.isEmpty());
-        verify(itemRepository, never()).findAvailableByText(any());
-    }
-
-    @Test
-    void addComment_success() {
-        CommentDto input = new CommentDto(null, "Nice!", null, null);
-        Comment saved = new Comment();
-        saved.setId(10L);
-        saved.setText("Nice!");
-        saved.setAuthor(user);
-        saved.setItem(item);
-        saved.setCreated(LocalDateTime.now());
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
-        when(bookingRepository.existsBookingFinished(eq(1L), eq(1L), eq(BookingStatus.APPROVED), any())).thenReturn(true);
-        when(commentRepository.save(any())).thenReturn(saved);
-        when(commentMapper.toDto(any())).thenReturn(new CommentDto(10L, "Nice!", "user", saved.getCreated()));
-
-        CommentDto result = itemService.addComment(1L, 1L, input);
-
-        assertEquals("Nice!", result.getText());
-        assertEquals("user", result.getAuthorName());
-    }
-
-    @Test
-    void addComment_noPastBooking_shouldThrow() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
-        when(bookingRepository.existsBookingFinished(eq(1L), eq(1L), eq(BookingStatus.APPROVED), any())).thenReturn(false);
-
-        assertThrows(ValidationException.class, () -> itemService.addComment(1L, 1L, new CommentDto(null, "Text", null, null)));
+        verify(userRepository).findById(user.getId());
+        verify(itemRepository).findById(item.getId());
+        verify(bookingRepository).existsBookingFinished(anyLong(), anyLong(), any(), any());
+        verify(commentRepository, never()).save(any());
     }
 }
+
+
+

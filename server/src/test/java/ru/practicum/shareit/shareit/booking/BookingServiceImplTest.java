@@ -6,8 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-import ru.practicum.shareit.ShareItServer;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingDtoInput;
 import ru.practicum.shareit.booking.mapper.BookingMapper;
@@ -31,7 +29,7 @@ import static org.mockito.Mockito.*;
 
 
 @ExtendWith(MockitoExtension.class)
-@SpringBootTest(classes = ShareItServer.class)
+
 class BookingServiceImplTest {
 
     @Mock
@@ -61,7 +59,7 @@ class BookingServiceImplTest {
         item.setId(1L);
         item.setAvailable(true);
         item.setOwner(new User());
-        item.getOwner().setId(2L); // другой владелец
+        item.getOwner().setId(2L); // другой владелец по умолчанию
 
         booking = new Booking();
         booking.setId(1L);
@@ -96,7 +94,8 @@ class BookingServiceImplTest {
 
     @Test
     void createBooking_shouldThrowValidationException_forOwnItem() {
-        item.getOwner().setId(1L); // тот же, что booker
+        // Владелец вещи совпадает с бронирующим — должно кинуть ValidationException
+        item.getOwner().setId(1L);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
@@ -108,7 +107,7 @@ class BookingServiceImplTest {
     @Test
     void approveBooking_shouldReturnApprovedBookingDto() {
         booking.setStatus(BookingStatus.WAITING);
-        item.getOwner().setId(1L); // владелец
+        item.getOwner().setId(1L); // владелец вещи — тот же пользователь
 
         Booking approvedBooking = new Booking();
         approvedBooking.setId(1L);
@@ -139,6 +138,7 @@ class BookingServiceImplTest {
 
     @Test
     void getUserBookings_shouldThrowNotFound_ifUserNotExist() {
+        // Проверяем вызов existsById — в методе сервиса именно он вызывается
         when(userRepository.existsById(1L)).thenReturn(false);
 
         assertThrows(NotFoundException.class, () ->
@@ -153,3 +153,4 @@ class BookingServiceImplTest {
                 bookingService.getOwnerBookings(1L, "ALL"));
     }
 }
+
