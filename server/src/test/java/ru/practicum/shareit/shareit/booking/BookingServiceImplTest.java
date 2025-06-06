@@ -13,6 +13,7 @@ import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.model.BookingStatus;
 import ru.practicum.shareit.booking.repository.BookingRepository;
 import ru.practicum.shareit.booking.service.BookingServiceImpl;
+import ru.practicum.shareit.exception.ForbiddenException;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.item.model.Item;
@@ -21,10 +22,10 @@ import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 
@@ -93,20 +94,33 @@ class BookingServiceImplTest {
 
     @Test
     void createBooking_shouldThrowValidationException_forOwnItem() {
-        // Владелец вещи совпадает с бронирующим — должно кинуть ValidationException
         item.getOwner().setId(1L);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
 
-        assertThrows(ValidationException.class, () ->
+        ValidationException ex = assertThrows(ValidationException.class, () ->
                 bookingService.createBooking(1L, bookingDtoInput));
+        assertEquals("Нельзя бронировать свою вещь", ex.getMessage());
     }
+
+    @Test
+    void createBooking_shouldThrowValidationException_ifItemUnavailable() {
+        item.setAvailable(false);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+
+        ValidationException ex = assertThrows(ValidationException.class, () ->
+                bookingService.createBooking(1L, bookingDtoInput));
+        assertEquals("Вещь недоступна для бронирования", ex.getMessage());
+    }
+
 
     @Test
     void approveBooking_shouldReturnApprovedBookingDto() {
         booking.setStatus(BookingStatus.WAITING);
-        item.getOwner().setId(1L); // владелец вещи — тот же пользователь
+        item.getOwner().setId(1L);
 
         Booking approvedBooking = new Booking();
         approvedBooking.setId(1L);
@@ -126,6 +140,30 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void approveBooking_shouldThrowForbiddenException_ifUserNotOwner() {
+        booking.setStatus(BookingStatus.WAITING);
+        item.getOwner().setId(2L);
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        ForbiddenException ex = assertThrows(ForbiddenException.class, () ->
+                bookingService.approveBooking(1L, 1L, true));
+        assertEquals("Подтверждение может выполнять только владелец вещи", ex.getMessage());
+    }
+
+    @Test
+    void approveBooking_shouldThrowValidationException_ifBookingAlreadyProcessed() {
+        booking.setStatus(BookingStatus.APPROVED);
+        item.getOwner().setId(1L);
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        ValidationException ex = assertThrows(ValidationException.class, () ->
+                bookingService.approveBooking(1L, 1L, true));
+        assertEquals("Бронирование уже рассмотрено", ex.getMessage());
+    }
+
+    @Test
     void getBooking_shouldReturnBookingDto_forBooker() {
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingMapper.toDto(any())).thenReturn(bookingDto);
@@ -136,8 +174,17 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void getBooking_shouldThrowNotFoundException_ifUserNotBookerOrOwner() {
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        long otherUserId = 3L;
+
+        NotFoundException ex = assertThrows(NotFoundException.class, () ->
+                bookingService.getBooking(otherUserId, 1L));
+        assertEquals("Доступ запрещён", ex.getMessage());
+    }
+
+    @Test
     void getUserBookings_shouldThrowNotFound_ifUserNotExist() {
-        // Проверяем вызов existsById — в методе сервиса именно он вызывается
         when(userRepository.existsById(1L)).thenReturn(false);
 
         assertThrows(NotFoundException.class, () ->
@@ -151,5 +198,55 @@ class BookingServiceImplTest {
         assertThrows(NotFoundException.class, () ->
                 bookingService.getOwnerBookings(1L, "ALL"));
     }
+
+    @Test
+    void getUserBookings_shouldReturnListByAllStates() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+        LocalDateTime now = LocalDateTime.now();
+
+        when(bookingRepository.findAllByBookerId(1L)).thenReturn(List.of(booking));
+        when(bookingRepository.findCurrentByBookerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findPastByBookerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findFutureByBookerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findWaitingByBookerId(1L)).thenReturn(List.of());
+        when(bookingRepository.findRejectedByBookerId(1L)).thenReturn(List.of());
+
+        when(bookingMapper.toDto(any())).thenReturn(bookingDto);
+
+        for (String state : List.of("ALL", "CURRENT", "PAST", "FUTURE", "WAITING", "REJECTED")) {
+            List<BookingDto> result = bookingService.getUserBookings(1L, state);
+            if (state.equals("ALL")) {
+                assertFalse(result.isEmpty());
+            } else {
+                assertTrue(result.isEmpty());
+            }
+        }
+    }
+
+    @Test
+    void getOwnerBookings_shouldReturnListByAllStates() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+        LocalDateTime now = LocalDateTime.now();
+
+        when(bookingRepository.findAllByOwnerId(1L)).thenReturn(List.of(booking));
+        when(bookingRepository.findCurrentByOwnerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findPastByOwnerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findFutureByOwnerId(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+        when(bookingRepository.findWaitingByOwnerId(1L)).thenReturn(List.of());
+        when(bookingRepository.findRejectedByOwnerId(1L)).thenReturn(List.of());
+
+        when(bookingMapper.toDto(any())).thenReturn(bookingDto);
+
+        for (String state : List.of("ALL", "CURRENT", "PAST", "FUTURE", "WAITING", "REJECTED")) {
+            List<BookingDto> result = bookingService.getOwnerBookings(1L, state);
+            if (state.equals("ALL")) {
+                assertFalse(result.isEmpty());
+            } else {
+                assertTrue(result.isEmpty());
+            }
+        }
+    }
+
 }
+
 
