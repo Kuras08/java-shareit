@@ -21,6 +21,8 @@ public class BookingClient extends BaseClient {
                         .uriTemplateHandler(new DefaultUriBuilderFactory(serverUrl + API_PREFIX))
                         .requestFactory(() -> new HttpComponentsClientHttpRequestFactory())
                         .build()
+
+
         );
     }
 
@@ -49,5 +51,3 @@ public class BookingClient extends BaseClient {
         return get(path, userId);
     }
 }
-
-
