@@ -21,7 +21,8 @@ class ItemRequestDtoJsonTest {
 
     @Test
     void testDeserializeValidJson() throws Exception {
-        String json = "{\"id\":1,\"description\":\"Описание запроса\",\"created\":\"2025-06-06T12:30:00\",\"items\":[{\"id\":2,\"name\":\"Short item name\",\"ownerId\":3}]}";
+        String json = "{\"id\":1,\"description\":\"Описание запроса\",\"created\":" +
+                "\"2025-06-06T12:30:00\",\"items\":[{\"id\":2,\"name\":\"Short item name\",\"ownerId\":3}]}";
 
         ItemRequestDto dto = objectMapper.readValue(json, ItemRequestDto.class);
 
@@ -40,7 +41,8 @@ class ItemRequestDtoJsonTest {
     @Test
     void testSerialize() throws Exception {
         ItemShortDto itemShortDto = new ItemShortDto(2L, "Short item name", 3L);
-        ItemRequestDto dto = new ItemRequestDto(1L, "Описание запроса", LocalDateTime.of(2025, 6, 6, 12, 30), List.of(itemShortDto));
+        ItemRequestDto dto = new ItemRequestDto(1L, "Описание запроса",
+                LocalDateTime.of(2025, 6, 6, 12, 30), List.of(itemShortDto));
 
         String json = objectMapper.writeValueAsString(dto);
 
@@ -55,7 +57,8 @@ class ItemRequestDtoJsonTest {
 
     @Test
     void testDeserializeEmptyItems() throws Exception {
-        String json = "{\"id\":1,\"description\":\"Описание запроса\",\"created\":\"2025-06-06T12:30:00\",\"items\":[]}";
+        String json = "{\"id\":1,\"description\":\"Описание запроса\"," +
+                "\"created\":\"2025-06-06T12:30:00\",\"items\":[]}";
 
         ItemRequestDto dto = objectMapper.readValue(json, ItemRequestDto.class);
 

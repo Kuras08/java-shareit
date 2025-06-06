@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ContextConfiguration(classes = ShareItGateway.class)
 class ItemRequestControllerTest {
 
-    private final String HEADER_USER_ID = "X-Sharer-User-Id";
+    private static final String HEADER_USER_ID = "X-Sharer-User-Id";
     @Autowired
     private MockMvc mockMvc;
     @MockBean
