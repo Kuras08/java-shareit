@@ -17,13 +17,7 @@ class UserDtoJsonTest {
 
     @Test
     void testDeserialize() throws Exception {
-        String json = """
-                {
-                    "id": 1,
-                    "name": "Alice",
-                    "email": "alice@example.com"
-                }
-                """;
+        String json = "{\"id\":1,\"name\":\"Alice\",\"email\":\"alice@example.com\"}";
 
         UserDto dto = objectMapper.readValue(json, UserDto.class);
 
@@ -48,4 +42,5 @@ class UserDtoJsonTest {
         assertThat(json).contains("\"email\":\"alice@example.com\"");
     }
 }
+
 

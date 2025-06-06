@@ -21,22 +21,8 @@ class ItemDtoJsonTest {
 
     @Test
     void testDeserializeValidJson() throws Exception {
-        String json = """
-                {
-                    "id": 1,
-                    "name": "Item name",
-                    "description": "Item description",
-                    "available": true,
-                    "comments": [
-                        {
-                            "id": 10,
-                            "text": "Nice item",
-                            "authorName": "John"
-                        }
-                    ],
-                    "requestId": 5
-                }
-                """;
+        String json = "{\"id\":1,\"name\":\"Item name\",\"description\":\"Item description\",\"available\":true,"
+                + "\"comments\":[{\"id\":10,\"text\":\"Nice item\",\"authorName\":\"John\"}],\"requestId\":5}";
 
         ItemDto dto = objectMapper.readValue(json, ItemDto.class);
 
@@ -73,14 +59,7 @@ class ItemDtoJsonTest {
 
     @Test
     void testDeserializeNullName() {
-        String json = """
-                {
-                    "id": 1,
-                    "name": null,
-                    "description": "Description",
-                    "available": true
-                }
-                """;
+        String json = "{\"id\":1,\"name\":null,\"description\":\"Description\",\"available\":true}";
 
         ItemDto dto = null;
         try {
@@ -95,16 +74,11 @@ class ItemDtoJsonTest {
 
     @Test
     void testDeserializeMissingAvailable() throws Exception {
-        String json = """
-                {
-                    "id": 1,
-                    "name": "Item",
-                    "description": "Description"
-                }
-                """;
+        String json = "{\"id\":1,\"name\":\"Item\",\"description\":\"Description\"}";
 
         ItemDto dto = objectMapper.readValue(json, ItemDto.class);
         assertThat(dto.getAvailable()).isNull();
     }
 }
+
 

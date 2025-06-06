@@ -19,14 +19,7 @@ class CommentDtoJsonTest {
 
     @Test
     void testDeserializeValidJson() throws Exception {
-        String json = """
-                {
-                    "id": 10,
-                    "text": "Nice item",
-                    "authorName": "John",
-                    "created": "2025-07-01T12:00:00"
-                }
-                """;
+        String json = "{\"id\":10,\"text\":\"Nice item\",\"authorName\":\"John\",\"created\":\"2025-07-01T12:00:00\"}";
 
         CommentDto dto = objectMapper.readValue(json, CommentDto.class);
 
@@ -56,18 +49,12 @@ class CommentDtoJsonTest {
 
     @Test
     void testDeserializeEmptyText() throws Exception {
-        String json = """
-                {
-                    "id": 10,
-                    "text": "",
-                    "authorName": "John",
-                    "created": "2025-07-01T12:00:00"
-                }
-                """;
+        String json = "{\"id\":10,\"text\":\"\",\"authorName\":\"John\",\"created\":\"2025-07-01T12:00:00\"}";
 
         CommentDto dto = objectMapper.readValue(json, CommentDto.class);
         // При пустой строке поле десериализуется, но валидация (NotBlank) не сработает здесь
         assertThat(dto.getText()).isEmpty();
     }
 }
+
 

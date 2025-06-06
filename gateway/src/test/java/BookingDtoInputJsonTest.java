@@ -19,13 +19,7 @@ class BookingDtoInputJsonTest {
 
     @Test
     void testDeserializeValidJson() throws Exception {
-        String json = """
-                {
-                    "start": "2025-07-01T12:00:00",
-                    "end": "2025-07-02T12:00:00",
-                    "itemId": 123
-                }
-                """;
+        String json = "{\"start\":\"2025-07-01T12:00:00\",\"end\":\"2025-07-02T12:00:00\",\"itemId\":123}";
 
         BookingDtoInput dto = objectMapper.readValue(json, BookingDtoInput.class);
 
@@ -51,13 +45,7 @@ class BookingDtoInputJsonTest {
 
     @Test
     void testDeserializeInvalidDateFormat() {
-        String json = """
-                {
-                    "start": "07-01-2025 12:00:00",
-                    "end": "2025-07-02T12:00:00",
-                    "itemId": 123
-                }
-                """;
+        String json = "{\"start\":\"07-01-2025 12:00:00\",\"end\":\"2025-07-02T12:00:00\",\"itemId\":123}";
 
         // Попытка десериализации с неверным форматом даты должна выбросить исключение
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -66,6 +54,7 @@ class BookingDtoInputJsonTest {
         );
     }
 }
+
 
 
 

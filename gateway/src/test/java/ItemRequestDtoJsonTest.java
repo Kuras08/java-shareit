@@ -20,14 +20,7 @@ class ItemRequestDtoJsonTest {
 
     @Test
     void testDeserialize() throws Exception {
-        String json = """
-                {
-                    "id": 5,
-                    "description": "Need a drill",
-                    "created": "2025-07-01T15:30:00",
-                    "items": []
-                }
-                """;
+        String json = "{\"id\":5,\"description\":\"Need a drill\",\"created\":\"2025-07-01T15:30:00\",\"items\":[]}";
 
         ItemRequestDto dto = objectMapper.readValue(json, ItemRequestDto.class);
 
@@ -56,4 +49,5 @@ class ItemRequestDtoJsonTest {
         assertThat(json).contains("\"items\":[]");
     }
 }
+
 
