@@ -56,3 +56,4 @@ class ItemRequestDtoJsonTest {
         assertThat(json).contains("\"items\":[]");
     }
 }
+

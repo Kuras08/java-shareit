@@ -54,7 +54,6 @@ class CommentDtoJsonTest {
         assertThat(json).contains("\"created\":\"2025-07-01T12:00:00\"");
     }
 
-
     @Test
     void testDeserializeEmptyText() throws Exception {
         String json = """
@@ -71,3 +70,4 @@ class CommentDtoJsonTest {
         assertThat(dto.getText()).isEmpty();
     }
 }
+

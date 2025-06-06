@@ -44,7 +44,6 @@ class BookingDtoInputJsonTest {
 
         String json = objectMapper.writeValueAsString(dto);
 
-        // Проверим, что JSON содержит ключи и значения в ISO формате
         assertThat(json).contains("\"start\":\"2025-07-01T12:00:00\"");
         assertThat(json).contains("\"end\":\"2025-07-02T12:00:00\"");
         assertThat(json).contains("\"itemId\":123");
@@ -63,9 +62,11 @@ class BookingDtoInputJsonTest {
         // Попытка десериализации с неверным форматом даты должна выбросить исключение
         org.junit.jupiter.api.Assertions.assertThrows(
                 com.fasterxml.jackson.databind.exc.InvalidFormatException.class,
-                () -> objectMapper.readValue(json, BookingDtoInput.class));
+                () -> objectMapper.readValue(json, BookingDtoInput.class)
+        );
     }
 }
+
 
 
 

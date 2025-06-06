@@ -107,3 +107,4 @@ class ItemDtoJsonTest {
         assertThat(dto.getAvailable()).isNull();
     }
 }
+

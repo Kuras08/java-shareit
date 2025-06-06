@@ -48,3 +48,4 @@ class UserDtoJsonTest {
         assertThat(json).contains("\"email\":\"alice@example.com\"");
     }
 }
+
